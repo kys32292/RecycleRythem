@@ -1,0 +1,47 @@
+{
+    "songName": "new_chart",
+    "songOffset": 0.0,
+    "notes": [
+
+        {
+            "time": 2.0,
+            "lane": 0
+        },
+        {
+            "time": 13.8,
+            "lane": 0
+        },
+        {
+            "time": 24.3,
+            "lane": 0
+        },
+        {
+            "time": 25.8,
+            "lane": 0
+        },
+        {
+            "time": 37.7,
+            "lane": 0
+        },
+        {
+            "time": 40.6,
+            "lane": 0
+        },
+        {
+            "time": 43.7,
+            "lane": 0
+        },
+        {
+            "time": 49.7,
+            "lane": 0
+        },
+        {
+            "time": 55.6,
+            "lane": 0
+        },
+        {
+            "time": 66.6,
+            "lane": 0
+        }
+    ]
+}
