@@ -46,6 +46,9 @@ public class ChartRuntimeManager : MonoBehaviour
     [SerializeField] private float goodWindow = 0.1f;
     [SerializeField] private float fairWindow = 0.18f;
 
+    public event Action NoteHit;
+    public event Action NoteMiss;
+
     private readonly List<RuntimeChartNote> chartNotes = new List<RuntimeChartNote>();
     private int nextSpawnIndex;
     private bool isLoaded;
@@ -379,6 +382,11 @@ public class ChartRuntimeManager : MonoBehaviour
 
         runtimeNote.IsConsumed = true;
         runtimeNote.Result = result;
+
+        if (result == JudgeResult.Miss)
+            NoteMiss?.Invoke();
+        else
+            NoteHit?.Invoke();
 
         if (runtimeNote.GameObject != null)
         {
