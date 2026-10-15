@@ -1,0 +1,142 @@
+{
+  "songName": "초원",
+  "songOffset": 0.0,
+  "notes": [
+    {
+      "time": 3.4,
+      "lane": 0
+    },
+    {
+      "time": 9.8,
+      "lane": 0
+    },
+    {
+      "time": 13.1,
+      "lane": 0
+    },
+    {
+      "time": 16.2,
+      "lane": 0
+    },
+    {
+      "time": 19.3,
+      "lane": 0
+    },
+    {
+      "time": 20.0,
+      "lane": 0
+    },
+    {
+      "time": 21.0,
+      "lane": 0
+    },
+    {
+      "time": 22.7,
+      "lane": 0
+    },
+    {
+      "time": 25.8,
+      "lane": 0
+    },
+    {
+      "time": 28.2,
+      "lane": 0
+    },
+    {
+      "time": 38.6,
+      "lane": 0
+    },
+    {
+      "time": 41.9,
+      "lane": 0
+    },
+    {
+      "time": 42.5,
+      "lane": 0
+    },
+    {
+      "time": 43.3,
+      "lane": 0
+    },
+    {
+      "time": 44.1,
+      "lane": 0
+    },
+    {
+      "time": 45.0,
+      "lane": 0
+    },
+    {
+      "time": 45.8,
+      "lane": 0
+    },
+    {
+      "time": 46.6,
+      "lane": 0
+    },
+    {
+      "time": 48.2,
+      "lane": 0
+    },
+    {
+      "time": 49.0,
+      "lane": 0
+    },
+    {
+      "time": 49.8,
+      "lane": 0
+    },
+    {
+      "time": 50.6,
+      "lane": 0
+    },
+    {
+      "time": 51.4,
+      "lane": 0
+    },
+    {
+      "time": 52.2,
+      "lane": 0
+    },
+    {
+      "time": 54.0,
+      "lane": 0
+    },
+    {
+      "time": 54.8,
+      "lane": 0
+    },
+    {
+      "time": 55.6,
+      "lane": 0
+    },
+    {
+      "time": 57.4,
+      "lane": 0
+    },
+    {
+      "time": 58.2,
+      "lane": 0
+    },
+    {
+      "time": 60.0,
+      "lane": 0
+    },
+    {
+      "time": 60.8,
+      "lane": 0
+    },
+    {
+      "time": 61.6,
+      "lane": 0
+    },
+    {
+      "time": 64.2,
+      "lane": 0
+    },
+    {
+      "time": 69.9,
+      "lane": 0
+    }
+  ]
+}
