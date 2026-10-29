@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
-
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
+using UnityEngine.Serialization;
 
 [RequireComponent(typeof(AudioSource))]
 public class ChartRuntimeManager : MonoBehaviour
@@ -23,10 +20,13 @@ public class ChartRuntimeManager : MonoBehaviour
     [SerializeField] private InputManager inputManager;
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private TextAsset chartJsonAsset;
-    [SerializeField] private Transform upperSpawnPoint;
-    [SerializeField] private Transform lowerSpawnPoint;
-    [SerializeField] private Transform upperJudgePoint;
-    [SerializeField] private Transform lowerJudgePoint;
+    // 두 레인을 하나로 합쳤습니다. 이전 씬의 위쪽 지점 연결은 이름을 바꿔도 유지합니다.
+    [FormerlySerializedAs("upperSpawnPoint")]
+    [FormerlySerializedAs("SpawnPoint")]
+    [SerializeField] private Transform spawnPoint;
+    [FormerlySerializedAs("upperJudgePoint")]
+    [FormerlySerializedAs("JudgePoint")]
+    [SerializeField] private Transform judgePoint;
     [SerializeField] private Transform noteRoot;
 
     [Header("Chart")]
@@ -35,8 +35,9 @@ public class ChartRuntimeManager : MonoBehaviour
     [SerializeField] private bool playOnStart = true;
 
     [Header("Visuals")]
-    [SerializeField] private GameObject upperNotePrefab;
-    [SerializeField] private GameObject lowerNotePrefab;
+    [FormerlySerializedAs("upperNotePrefab")]
+    [SerializeField] private GameObject notePrefab;
+
     [SerializeField] private Vector3 fallbackNoteScale = new Vector3(0.7f, 0.7f, 0.7f);
     [SerializeField] private float travelTime = 2f;
     [SerializeField] private float cleanupDelayAfterJudge = 0.15f;
@@ -48,10 +49,14 @@ public class ChartRuntimeManager : MonoBehaviour
 
     public event Action NoteHit;
     public event Action NoteMiss;
+    // 수치 컴포넌트가 재시작과 곡 종료를 알 수 있게 합니다. 수동 정지는 종료 판정하지 않습니다.
+    public event Action PlaybackStarted;
+    public event Action PlaybackCompleted;
 
     private readonly List<RuntimeChartNote> chartNotes = new List<RuntimeChartNote>();
     private int nextSpawnIndex;
     private bool isLoaded;
+    private bool isPlaybackActive;
 
     private void Reset()
     {
@@ -67,8 +72,8 @@ public class ChartRuntimeManager : MonoBehaviour
     {
         if (inputManager != null)
         {
-            inputManager.JumpPressed += HandleUpperInput;
-            inputManager.AttackPressed += HandleLowerInput;
+            inputManager.Pressed += HandlePressed;
+            // 일반 노트는 누를 때만 판정합니다. 떼는 순간까지 판정하면 한 번의 조작으로 두 노트를 칠 수 있습니다.
         }
     }
 
@@ -76,8 +81,7 @@ public class ChartRuntimeManager : MonoBehaviour
     {
         if (inputManager != null)
         {
-            inputManager.JumpPressed -= HandleUpperInput;
-            inputManager.AttackPressed -= HandleLowerInput;
+            inputManager.Pressed -= HandlePressed;
         }
     }
 
@@ -93,8 +97,15 @@ public class ChartRuntimeManager : MonoBehaviour
 
     private void Update()
     {
-        if (!isLoaded || audioSource == null || !audioSource.isPlaying)
+        if (!isLoaded || audioSource == null || !isPlaybackActive)
         {
+            return;
+        }
+
+        // 기존 코드는 음악이 끝나면 바로 return해서 결과를 계산할 기회가 없었습니다.
+        if (!audioSource.isPlaying)
+        {
+            CompletePlayback();
             return;
         }
 
@@ -106,6 +117,12 @@ public class ChartRuntimeManager : MonoBehaviour
     [ContextMenu("Load Chart")]
     public void LoadChart()
     {
+        // 재생 중 채보를 바꾸면 이전 곡의 종료/노트 이벤트가 섞이지 않도록 먼저 정지합니다.
+        if (isPlaybackActive)
+        {
+            StopPlayback();
+        }
+
         ChartFileData loadedChart = TryLoadChart();
 
         if (loadedChart == null)
@@ -139,19 +156,22 @@ public class ChartRuntimeManager : MonoBehaviour
             LoadChart();
         }
 
-        if (!ValidateRuntimeSetup())
+        if (!isLoaded || !ValidateRuntimeSetup())
         {
             return;
         }
 
         ResetRuntimeState();
+        PlaybackStarted?.Invoke(); // 매번 새 시도는 수치 50부터 시작합니다.
         audioSource.Play();
+        isPlaybackActive = true;
         Debug.Log("[ChartRuntime] Playback started.");
     }
 
     [ContextMenu("Stop Playback")]
     public void StopPlayback()
     {
+        isPlaybackActive = false; // 사용자가 중단한 곡에는 클리어/실패 판정을 내리지 않습니다.
         if (audioSource != null)
         {
             audioSource.Stop();
@@ -161,41 +181,24 @@ public class ChartRuntimeManager : MonoBehaviour
         ResetRuntimeState();
         Debug.Log("[ChartRuntime] Playback stopped.");
     }
-
-    [ContextMenu("Judge Upper")]
-    public void JudgeUpper()
+    [ContextMenu("Judge Note")]
+    private void HandlePressed()
     {
-        HandleLaneJudge(LaneType.Upper);
-    }
-
-    [ContextMenu("Judge Lower")]
-    public void JudgeLower()
-    {
-        HandleLaneJudge(LaneType.Lower);
-    }
-
-    private void HandleUpperInput()
-    {
-        HandleLaneJudge(LaneType.Upper);
-    }
-
-    private void HandleLowerInput()
-    {
-        HandleLaneJudge(LaneType.Lower);
-    }
-
-    private void HandleLaneJudge(LaneType lane)
-    {
-        if (!isLoaded || audioSource == null)
+        // 정지 상태에서 입력해도 노트나 수치가 바뀌지 않게 재생 상태까지 확인합니다.
+        if (!isLoaded || !isPlaybackActive || audioSource == null || !audioSource.isPlaying)
         {
             return;
         }
 
-        RuntimeChartNote candidate = FindBestCandidate(lane, false);
+        // 입력 Update가 먼저 실행된 프레임에도, 현재 시각까지 등장할 노트는 판정할 수 있어야 합니다.
+        SpawnPendingNotes();
+        // 만료된 노트의 -20을 새 성공의 +5보다 먼저 처리해 프레임 실행 순서에 따른 수치 차이를 막습니다.
+        MissExpiredNotes();
+        RuntimeChartNote candidate = FindBestCandidate();
 
         if (candidate == null)
         {
-            Debug.Log(string.Format("[ChartRuntime] {0} input -> no candidate", lane));
+            Debug.Log("[ChartRuntime] Input -> no candidate");
             return;
         }
 
@@ -204,12 +207,12 @@ public class ChartRuntimeManager : MonoBehaviour
 
         if (result == JudgeResult.None || result == JudgeResult.Miss)
         {
-            Debug.Log(string.Format("[ChartRuntime] {0} input -> outside fair window ({1:F3}s)", lane, error));
+            Debug.Log(string.Format("[ChartRuntime] Input -> outside fair window ({0:F3}s)", error));
             return;
         }
 
         ConsumeNote(candidate, result);
-        Debug.Log(string.Format("[ChartRuntime] {0} -> {1} ({2:F3}s)", lane, result, error));
+        Debug.Log(string.Format("[ChartRuntime] {0} ({1:F3}s)", result, error));
     }
 
     private void SpawnPendingNotes()
@@ -238,8 +241,8 @@ public class ChartRuntimeManager : MonoBehaviour
             return;
         }
 
-        Transform spawnPoint = runtimeNote.NoteData.lane == LaneType.Upper ? upperSpawnPoint : lowerSpawnPoint;
-        GameObject prefab = runtimeNote.NoteData.lane == LaneType.Upper ? upperNotePrefab : lowerNotePrefab;
+        // ChartNoteData에는 이제 시간만 있습니다. 모든 노트가 같은 지점과 프리팹을 사용합니다.
+        GameObject prefab = notePrefab;
 
         GameObject noteObject;
 
@@ -264,11 +267,11 @@ public class ChartRuntimeManager : MonoBehaviour
             Renderer renderer = noteObject.GetComponent<Renderer>();
             if (renderer != null)
             {
-                renderer.material.color = runtimeNote.NoteData.lane == LaneType.Upper ? Color.cyan : Color.magenta;
+                renderer.material.color = Color.cyan;
             }
         }
 
-        noteObject.name = string.Format("ChartNote_{0}_{1:F3}", runtimeNote.NoteData.lane, runtimeNote.NoteData.time);
+        noteObject.name = string.Format("ChartNote_{0:F3}", runtimeNote.NoteData.time);
 
         runtimeNote.GameObject = noteObject;
         runtimeNote.IsSpawned = true;
@@ -286,9 +289,6 @@ public class ChartRuntimeManager : MonoBehaviour
             {
                 continue;
             }
-
-            Transform spawnPoint = runtimeNote.NoteData.lane == LaneType.Upper ? upperSpawnPoint : lowerSpawnPoint;
-            Transform judgePoint = runtimeNote.NoteData.lane == LaneType.Upper ? upperJudgePoint : lowerJudgePoint;
 
             float spawnTime = runtimeNote.NoteData.time - travelTime;
             float normalized = travelTime <= 0f
@@ -317,11 +317,11 @@ public class ChartRuntimeManager : MonoBehaviour
             }
 
             ConsumeNote(runtimeNote, JudgeResult.Miss);
-            Debug.Log(string.Format("[ChartRuntime] {0} -> Miss", runtimeNote.NoteData.lane));
+            Debug.Log(string.Format("[ChartRuntime] {0:F3}s -> Miss", runtimeNote.NoteData.time));
         }
     }
 
-    private RuntimeChartNote FindBestCandidate(LaneType lane, bool includeExpired)
+    private RuntimeChartNote FindBestCandidate()
     {
         RuntimeChartNote best = null;
         float bestError = float.MaxValue;
@@ -331,12 +331,13 @@ public class ChartRuntimeManager : MonoBehaviour
         {
             RuntimeChartNote runtimeNote = chartNotes[i];
 
-            if (runtimeNote.NoteData.lane != lane || runtimeNote.IsConsumed || !runtimeNote.IsSpawned)
+            // 레인 필터 대신 전체 노트 중 아직 처리하지 않은 가장 가까운 노트를 찾습니다.
+            if (runtimeNote.IsConsumed || !runtimeNote.IsSpawned)
             {
                 continue;
             }
 
-            if (!includeExpired && currentTime > runtimeNote.NoteData.time + fairWindow)
+            if (currentTime > runtimeNote.NoteData.time + fairWindow)
             {
                 continue;
             }
@@ -383,7 +384,9 @@ public class ChartRuntimeManager : MonoBehaviour
         runtimeNote.IsConsumed = true;
         runtimeNote.Result = result;
 
-        if (result == JudgeResult.Miss)
+        // Fair도 실패로 처리합니다. 실패 이벤트를 공통으로 보내 오염도 -20과 실패 애니메이션을 적용합니다.
+        // 위에서 이미 소비 처리했으므로 Fair 노트가 나중에 시간 초과로 다시 감점되지는 않습니다.
+        if (result == JudgeResult.Fair || result == JudgeResult.Miss)
             NoteMiss?.Invoke();
         else
             NoteHit?.Invoke();
@@ -414,6 +417,12 @@ public class ChartRuntimeManager : MonoBehaviour
 
     private void EnsureReferences()
     {
+        // 기존 씬/프리팹도 별도 수작업 없이 수치 규칙이 작동하도록 같은 오브젝트에 붙입니다.
+        if (GetComponent<PollutionManager>() == null)
+        {
+            gameObject.AddComponent<PollutionManager>();
+        }
+
         if (inputManager == null)
         {
             inputManager = FindFirstObjectByType<InputManager>();
@@ -446,13 +455,32 @@ public class ChartRuntimeManager : MonoBehaviour
             return false;
         }
 
-        if (upperSpawnPoint == null || lowerSpawnPoint == null || upperJudgePoint == null || lowerJudgePoint == null)
+        if (spawnPoint == null || judgePoint == null)
         {
             Debug.LogWarning("[ChartRuntime] Spawn/Judge point references are missing.");
             return false;
         }
 
         return true;
+    }
+
+    private void CompletePlayback()
+    {
+        // 먼저 닫아 두면 다음 프레임이나 이벤트 처리 중 종료 판정이 중복되지 않습니다.
+        isPlaybackActive = false;
+
+        // 마지막 노트 직후 곡이 끝나면 fairWindow를 기다릴 수 없으므로 남은 노트는 Miss로 확정합니다.
+        // 수치 반영이 모두 끝난 뒤에만 최종 결과를 알립니다. 노트별 IsConsumed가 중복 감점을 막습니다.
+        foreach (RuntimeChartNote note in chartNotes)
+        {
+            if (!note.IsConsumed)
+            {
+                ConsumeNote(note, JudgeResult.Miss);
+            }
+        }
+
+        PlaybackCompleted?.Invoke();
+        Debug.Log("[ChartRuntime] Playback completed.");
     }
 
     private void ResetRuntimeState()
