@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 노트 판정과 오염도 수치를 분리합니다. ChartRuntimeManager는 타이밍을,
@@ -102,6 +103,9 @@ public class PollutionManager : MonoBehaviour
         Result = currentValue > 80
             ? RoundResult.GreatSuccess
             : currentValue > 50 ? RoundResult.Clear : RoundResult.Failed;
+
+        if (Result == RoundResult.Clear || Result == RoundResult.GreatSuccess)
+            StageClearStore.MarkCleared(SceneManager.GetActiveScene().name);
 
         RoundFinished?.Invoke(Result);
         Debug.Log($"[Pollution] Song ended: {currentValue}/{MaxValue} -> {Result}");

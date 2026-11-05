@@ -53,6 +53,10 @@ public class ChartRuntimeManager : MonoBehaviour
     public event Action PlaybackStarted;
     public event Action PlaybackCompleted;
 
+    public float LastNoteTime { get; private set; }
+    public float PlaybackTime => audioSource != null ? audioSource.time : 0f;
+    public bool IsPlaybackActive => isPlaybackActive;
+
     private readonly List<RuntimeChartNote> chartNotes = new List<RuntimeChartNote>();
     private int nextSpawnIndex;
     private bool isLoaded;
@@ -144,6 +148,7 @@ public class ChartRuntimeManager : MonoBehaviour
 
         nextSpawnIndex = 0;
         isLoaded = true;
+        LastNoteTime = chartNotes.Count > 0 ? chartNotes[chartNotes.Count - 1].NoteData.time : 0f;
 
         Debug.Log(string.Format("[ChartRuntime] Loaded chart '{0}' with {1} notes.", loadedChart.songName, chartNotes.Count));
     }

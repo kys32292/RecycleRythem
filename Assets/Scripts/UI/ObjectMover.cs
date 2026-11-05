@@ -11,6 +11,10 @@ public class ObjectMover : MonoBehaviour
 
     [Header("옵션")]
     public bool smoothMovement = true;
+
+    [Tooltip("체크하면 회전 관련 로직을 끄고, 오직 위치 이동(위아래 등)만 수행합니다.")]
+    public bool onlyMoveVertical = true; // <-- 새로 추가된 인스펙터 옵션
+
     [Tooltip("체크하면 이동 방향을 바라보고, 도착 시 반대 방향으로 회전합니다.")]
     public bool lookAtMovement = true;
 
@@ -36,8 +40,8 @@ public class ObjectMover : MonoBehaviour
             // 1. 나갈 때 이동
             yield return StartCoroutine(MoveRoutine(targetPosition, moveDirection, moveDuration));
 
-            // 도착 후 회전 옵션이 켜져있다면 반대 방향으로 즉시 회전
-            if (lookAtMovement && moveDirection != Vector3.zero)
+            // 도착 후 회전 옵션이 켜져있고, 수직 이동 모드가 아닐 때만 회전
+            if (!onlyMoveVertical && lookAtMovement && moveDirection != Vector3.zero)
             {
                 transform.rotation = Quaternion.LookRotation(-moveDirection);
             }
@@ -46,11 +50,11 @@ public class ObjectMover : MonoBehaviour
             yield return new WaitForSeconds(stayDuration);
 
             // 3. 돌아올 때 이동
-            Vector3 returnDir = lookAtMovement ? -moveDirection : moveDirection;
+            Vector3 returnDir = (!onlyMoveVertical && lookAtMovement) ? -moveDirection : moveDirection;
             yield return StartCoroutine(MoveRoutine(originalPosition, returnDir, moveDuration));
 
-            // 원래 자리에 도착 후 회전 옵션이 켜져있다면 원래 회전 값으로 즉시 복귀
-            if (lookAtMovement)
+            // 원래 자리에 도착 후 회전 옵션이 켜져있고, 수직 이동 모드가 아닐 때만 원위치 복귀
+            if (!onlyMoveVertical && lookAtMovement)
             {
                 transform.rotation = originalRotation;
             }
@@ -65,7 +69,8 @@ public class ObjectMover : MonoBehaviour
         float time = 0f;
         Vector3 startPos = transform.position;
 
-        if (lookAtMovement && lookDir != Vector3.zero)
+        // 수직 이동 모드가 아닐 때만 바라보기 회전 수행
+        if (!onlyMoveVertical && lookAtMovement && lookDir != Vector3.zero)
         {
             transform.rotation = Quaternion.LookRotation(lookDir);
         }
@@ -74,9 +79,11 @@ public class ObjectMover : MonoBehaviour
         {
             time += Time.deltaTime;
             float t = time / duration;
-            float smoothT = Mathf.SmoothStep(0f, 1f, t);
 
-            transform.position = Vector3.Lerp(startPos, targetPos, smoothT);
+            // smoothMovement 여부에 따른 보간 적용
+            float currentT = smoothMovement ? Mathf.SmoothStep(0f, 1f, t) : t;
+
+            transform.position = Vector3.Lerp(startPos, targetPos, currentT);
 
             yield return null;
         }
