@@ -13,7 +13,11 @@ public class TitleScreenController : MonoBehaviour
 
     public void OnClickSettings()
     {
-        if (settingsPanel != null) settingsPanel.SetActive(true);
+        if (settingsPanel == null) return;
+        // 기존 씬과 프리팹에서도 별도 Inspector 연결 없이 키 설정 항목을 제공합니다.
+        if (settingsPanel.GetComponent<KeyBindingSettingsPanel>() == null)
+            settingsPanel.AddComponent<KeyBindingSettingsPanel>();
+        settingsPanel.SetActive(true);
     }
 
     public void CloseSettingsPanel()

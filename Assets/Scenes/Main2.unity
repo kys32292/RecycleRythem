@@ -407,6 +407,18 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
+      propertyPath: remixMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
+      propertyPath: judgePoint
+      value: 
+      objectReference: {fileID: 1993092545}
+    - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
+      propertyPath: spawnPoint
+      value: 
+      objectReference: {fileID: 193328816}
+    - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
       propertyPath: inputManager
       value: 
       objectReference: {fileID: 1972973975}
@@ -424,6 +436,26 @@ PrefabInstance:
       objectReference: {fileID: 1993092545}
     - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
       propertyPath: upperSpawnPoint
+      value: 
+      objectReference: {fileID: 193328816}
+    - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
+      propertyPath: remixLanes.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
+      propertyPath: remixLanes.Array.data[0].hitBox
+      value: 
+      objectReference: {fileID: 1993092545}
+    - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
+      propertyPath: remixLanes.Array.data[1].hitBox
+      value: 
+      objectReference: {fileID: 1993092545}
+    - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
+      propertyPath: remixLanes.Array.data[0].spawnPoint
+      value: 
+      objectReference: {fileID: 193328816}
+    - target: {fileID: 163028910188435606, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}
+      propertyPath: remixLanes.Array.data[1].spawnPoint
       value: 
       objectReference: {fileID: 193328816}
     - target: {fileID: 1148222009547759452, guid: 50e7707e922ff2f4f828a36e3bed714f, type: 3}

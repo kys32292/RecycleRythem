@@ -16,12 +16,12 @@ public class InputManager : MonoBehaviour
     public bool IsActionHeld { get; private set; }
 
     [Header("Keyboard Bindings")] // Inspector에 표시하는 항목 제목입니다.
-    // 사용할 키 종류를 저장합니다. 초기값은 Z이며, private 변수도 Inspector에서 편집할 수 있게 합니다.
+    // 사용할 키 종류를 저장합니다. 기본값은 스페이스바이며, Inspector에서도 편집할 수 있습니다.
     // 이미 씬이나 프리팹에 저장한 값이 있으면 그 값이 사용됩니다. 실제 입력 감지는 하지 않습니다.
-    [SerializeField] private Key keyboardAttackKey = Key.Z;
-    // 읽을 때마다 keyboardAttackKey 값을 돌려주는 읽기 전용 프로퍼티입니다. 키를 할당하는 코드는 아닙니다.
-    // 현재 이 파일에서는 사용하지 않습니다.
-    private Key AttackKey => keyboardAttackKey;
+    [SerializeField] private Key keyboardAttackKey = Key.Space;
+    // 사용자가 저장한 키를 우선 적용하고, 설정이 없으면 Inspector 값을 사용합니다.
+    public Key AttackKey => KeyboardBindingSettings.GetAttackKey(keyboardAttackKey);
+    private Key boundKey;
 
     // 어떤 버튼을 감지할지 설정하고, 눌림/뗌 상태를 조회하는 입력 객체를 담는 변수입니다.
     // 변수 이름이 Action일 뿐, 위 event에 사용한 System.Action(함수 형식)과는 다른 것입니다.
@@ -69,6 +69,15 @@ public class InputManager : MonoBehaviour
     // 활성화된 동안 매 프레임 실행하여 입력 상태를 확인합니다.
     private void Update()
     {
+        // 설정이 변경되면 활성 씬에서도 즉시 반영하고 이전 홀드 상태를 해제합니다.
+        if (boundKey != AttackKey)
+        {
+            if (IsActionHeld) Released?.Invoke();
+            IsActionHeld = false;
+            BuildActions();
+            Action.Enable();
+            return;
+        }
 
         if (Action.WasPressedThisFrame()) // KeyDown 감지: 누르기 시작한 프레임입니다.
         {
@@ -102,18 +111,10 @@ public class InputManager : MonoBehaviour
         Action = new InputAction("Attack", InputActionType.Button);
 
         // 저장된 키 종류를 입력 시스템의 경로 문자열로 바꿔 이 액션에 연결합니다.
-        Action.AddBinding(GetKeyboardBindingPath(keyboardAttackKey));
+        boundKey = AttackKey; // 현재 적용한 키를 기억하여 변경 여부를 감지합니다.
+        Action.AddBinding(KeyboardBindingSettings.GetPath(boundKey));
         // 같은 액션에 게임패드 아래쪽 버튼도 연결합니다. 키보드와 게임패드 어느 쪽으로든 조작 가능합니다.
         Action.AddBinding("<Gamepad>/buttonSouth");
     }
 
-    // Key 값을 입력 시스템이 알아듣는 키보드 경로 문자열로 변환합니다. 예: Key.Z → "<Keyboard>/z".
-    // key는 전달받는 값, string은 반환하는 값의 종류입니다.
-    // static 함수라 특정 InputManager 객체의 필드 없이 전달받은 값만으로 처리합니다.
-    private static string GetKeyboardBindingPath(Key key)
-    {
-        // ToString()으로 이름을 얻고 ToLowerInvariant()로 문화권에 관계없이 소문자로 바꿉니다.
-        // return은 완성한 문자열을 호출한 곳에 돌려주고 함수를 끝냅니다.
-        return $"<Keyboard>/{key.ToString().ToLowerInvariant()}";
-    }
 }
