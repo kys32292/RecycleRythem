@@ -45,4 +45,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   keyboardJumpKey: 40
-  keyboardAttackKey: 38
+  keyboardAttackKey: 1

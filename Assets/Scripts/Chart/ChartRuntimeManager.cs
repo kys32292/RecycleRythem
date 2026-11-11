@@ -16,6 +16,22 @@ public class ChartRuntimeManager : MonoBehaviour
         Miss
     }
 
+    // 기본값 false로 기존 씬의 단일 스포너/판정 동작을 유지합니다.
+    [SerializeField] private bool remixMode = false;
+
+    [Serializable]
+    private sealed class RemixLane
+    {
+        // 같은 목록 항목의 스포너와 히트 박스가 하나의 노트 이동 경로입니다.
+        public Transform spawnPoint;
+        public Transform hitBox;
+        [Tooltip("비워 두면 공통 Note Prefab을 사용합니다.")]
+        public GameObject notePrefab;
+    }
+
+    // 목록 인덱스가 JSON의 lane 번호입니다. 입력 키는 모든 경로가 공유합니다.
+    [SerializeField] private List<RemixLane> remixLanes = new List<RemixLane>();
+
     [Header("References")]
     [SerializeField] private InputManager inputManager;
     [SerializeField] private AudioSource audioSource;
@@ -199,8 +215,22 @@ public class ChartRuntimeManager : MonoBehaviour
         SpawnPendingNotes();
         // 만료된 노트의 -20을 새 성공의 +5보다 먼저 처리해 프레임 실행 순서에 따른 수치 차이를 막습니다.
         MissExpiredNotes();
-        RuntimeChartNote candidate = FindBestCandidate();
+        // 리믹스에서는 같은 입력으로 각 레인의 가장 가까운 노트를 하나씩 함께 판정합니다.
+        // 한 레인의 연속 노트까지 한 번에 소비하지 않도록 후보는 레인마다 하나로 제한합니다.
+        if (remixMode)
+        {
+            for (int lane = 0; lane < remixLanes.Count; lane++)
+                JudgeCandidate(FindBestCandidate(lane));
+            return;
+        }
 
+        RuntimeChartNote candidate = FindBestCandidate();
+        JudgeCandidate(candidate);
+    }
+
+    // 일반/리믹스 모두 동일한 판정 시간과 성공/실패 이벤트를 사용합니다.
+    private void JudgeCandidate(RuntimeChartNote candidate)
+    {
         if (candidate == null)
         {
             Debug.Log("[ChartRuntime] Input -> no candidate");
@@ -246,21 +276,25 @@ public class ChartRuntimeManager : MonoBehaviour
             return;
         }
 
-        // ChartNoteData에는 이제 시간만 있습니다. 모든 노트가 같은 지점과 프리팹을 사용합니다.
-        GameObject prefab = notePrefab;
+        // 일반 모드는 기존 연결을 사용하고 리믹스는 채보 lane에 해당하는 경로를 선택합니다.
+        RemixLane lane = remixMode ? remixLanes[runtimeNote.NoteData.lane] : null;
+        Transform origin = lane != null ? lane.spawnPoint : spawnPoint;
+        runtimeNote.SpawnPoint = origin;
+        runtimeNote.JudgePoint = lane != null ? lane.hitBox : judgePoint;
+        GameObject prefab = lane != null && lane.notePrefab != null ? lane.notePrefab : notePrefab;
 
         GameObject noteObject;
 
         if (prefab != null)
         {
-            noteObject = Instantiate(prefab, spawnPoint.position, spawnPoint.rotation, noteRoot);
+            noteObject = Instantiate(prefab, origin.position, origin.rotation, noteRoot);
         }
         else
         {
             noteObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
             noteObject.transform.SetParent(noteRoot, false);
-            noteObject.transform.position = spawnPoint.position;
-            noteObject.transform.rotation = spawnPoint.rotation;
+            noteObject.transform.position = origin.position;
+            noteObject.transform.rotation = origin.rotation;
             noteObject.transform.localScale = fallbackNoteScale;
 
             Collider fallbackCollider = noteObject.GetComponent<Collider>();
@@ -301,8 +335,8 @@ public class ChartRuntimeManager : MonoBehaviour
                 : Mathf.InverseLerp(spawnTime, runtimeNote.NoteData.time, currentTime);
 
             runtimeNote.GameObject.transform.position = Vector3.Lerp(
-                spawnPoint.position,
-                judgePoint.position,
+                runtimeNote.SpawnPoint.position,
+                runtimeNote.JudgePoint.position,
                 normalized
             );
         }
@@ -326,7 +360,7 @@ public class ChartRuntimeManager : MonoBehaviour
         }
     }
 
-    private RuntimeChartNote FindBestCandidate()
+    private RuntimeChartNote FindBestCandidate(int lane = -1)
     {
         RuntimeChartNote best = null;
         float bestError = float.MaxValue;
@@ -336,7 +370,9 @@ public class ChartRuntimeManager : MonoBehaviour
         {
             RuntimeChartNote runtimeNote = chartNotes[i];
 
-            // 레인 필터 대신 전체 노트 중 아직 처리하지 않은 가장 가까운 노트를 찾습니다.
+            // 일반 모드(-1)는 전체에서 찾고 리믹스는 지정한 레인의 노트만 비교합니다.
+            if (lane >= 0 && runtimeNote.NoteData.lane != lane) continue;
+
             if (runtimeNote.IsConsumed || !runtimeNote.IsSpawned)
             {
                 continue;
@@ -460,7 +496,35 @@ public class ChartRuntimeManager : MonoBehaviour
             return false;
         }
 
-        if (spawnPoint == null || judgePoint == null)
+        // 리믹스는 모든 경로와 채보 번호를 시작 전에 검사하여 잘못된 인덱스 접근을 막습니다.
+        if (remixMode)
+        {
+            if (remixLanes == null || remixLanes.Count == 0)
+            {
+                Debug.LogWarning("[ChartRuntime] Add at least one remix lane.");
+                return false;
+            }
+
+            for (int i = 0; i < remixLanes.Count; i++)
+            {
+                RemixLane lane = remixLanes[i];
+                if (lane == null || lane.spawnPoint == null || lane.hitBox == null)
+                {
+                    Debug.LogWarning($"[ChartRuntime] Remix lane {i}: Spawn Point / Hit Box is missing.");
+                    return false;
+                }
+            }
+
+            foreach (RuntimeChartNote note in chartNotes)
+            {
+                if (note.NoteData.lane < 0 || note.NoteData.lane >= remixLanes.Count)
+                {
+                    Debug.LogWarning($"[ChartRuntime] Invalid remix lane {note.NoteData.lane} at {note.NoteData.time}s.");
+                    return false;
+                }
+            }
+        }
+        else if (spawnPoint == null || judgePoint == null)
         {
             Debug.LogWarning("[ChartRuntime] Spawn/Judge point references are missing.");
             return false;
@@ -534,6 +598,9 @@ public class ChartRuntimeManager : MonoBehaviour
 
         public ChartNoteData NoteData { get; private set; }
         public GameObject GameObject { get; set; }
+        // 생성 시 결정한 경로를 저장해 각 노트가 자신의 히트 박스로 이동합니다.
+        public Transform SpawnPoint { get; set; }
+        public Transform JudgePoint { get; set; }
         public bool IsSpawned { get; set; }
         public bool IsConsumed { get; set; }
         public JudgeResult Result { get; set; }
@@ -541,6 +608,8 @@ public class ChartRuntimeManager : MonoBehaviour
         public void ResetRuntimeState()
         {
             GameObject = null;
+            SpawnPoint = null;
+            JudgePoint = null;
             IsSpawned = false;
             IsConsumed = false;
             Result = JudgeResult.None;
