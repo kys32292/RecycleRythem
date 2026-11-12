@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -13,7 +14,8 @@ public class ChartRuntimeManager : MonoBehaviour
         Great,
         Good,
         Fair,
-        Miss
+        Miss,
+        Ignored
     }
 
     // 기본값 false로 기존 씬의 단일 스포너/판정 동작을 유지합니다.
@@ -53,8 +55,14 @@ public class ChartRuntimeManager : MonoBehaviour
     [Header("Visuals")]
     [FormerlySerializedAs("upperNotePrefab")]
     [SerializeField] private GameObject notePrefab;
+    [Tooltip("비워 두면 일반 투사체를 어두운 빨간색으로 씁니다. 누르면 실패이고, 안 누르면 통과입니다.")]
+    [SerializeField] private GameObject trapNotePrefab;
+    [Tooltip("비워 두면 일반 투사체를 노란색으로 씁니다. 직선이 아니라 흔들리며 날아오고, 눌러야 성공입니다.")]
+    [SerializeField] private GameObject zigzagNotePrefab;
 
     [SerializeField] private Vector3 fallbackNoteScale = new Vector3(0.7f, 0.7f, 0.7f);
+    [SerializeField] private float zigzagWidth = 0.45f;
+    [SerializeField] private int zigzagTurns = 3;
     [SerializeField] private float travelTime = 2f;
     [SerializeField] private float cleanupDelayAfterJudge = 0.15f;
 
@@ -77,6 +85,9 @@ public class ChartRuntimeManager : MonoBehaviour
     private int nextSpawnIndex;
     private bool isLoaded;
     private bool isPlaybackActive;
+    private bool _countdownRunning;
+    private bool _spawnHold;
+    private int _activeLane = -1;
 
     private void Reset()
     {
@@ -109,9 +120,84 @@ public class ChartRuntimeManager : MonoBehaviour
     {
         LoadChart();
 
+        if (RemixStageTour.ShouldStaySilent(gameObject.scene))
+        {
+            enabled = false;
+            if (audioSource != null)
+            {
+                audioSource.playOnAwake = false;
+                audioSource.Stop();
+            }
+
+            return;
+        }
+
         if (playOnStart)
         {
-            StartPlayback();
+            StartAfterCountdown();
+        }
+    }
+
+    public void StartAfterCountdown()
+    {
+        if (_countdownRunning || isPlaybackActive)
+            return;
+
+        StartCoroutine(CountdownThenPlay());
+    }
+
+    private IEnumerator CountdownThenPlay()
+    {
+        _countdownRunning = true;
+        StageStartCountdown countdown = StageStartCountdown.Create();
+        for (int number = 3; number >= 1; number--)
+        {
+            countdown.Show(number);
+            yield return new WaitForSecondsRealtime(1f);
+        }
+
+        countdown.Close();
+        _countdownRunning = false;
+        StartPlayback();
+    }
+
+    public float SegmentLength(int stageCount, int laps)
+    {
+        int visits = Mathf.Max(1, stageCount * Mathf.Max(1, laps));
+        return Mathf.Max(0.01f, LastNoteTime) / visits;
+    }
+
+    public void ConfigureRemixLanes(System.Collections.Generic.IReadOnlyList<Transform> spawns, System.Collections.Generic.IReadOnlyList<Transform> judges)
+    {
+        remixMode = true;
+        remixLanes.Clear();
+        int count = Mathf.Min(spawns.Count, judges.Count);
+        for (int i = 0; i < count; i++)
+        {
+            remixLanes.Add(new RemixLane
+            {
+                spawnPoint = spawns[i],
+                hitBox = judges[i]
+            });
+        }
+    }
+
+    public void AssignRoundRobinLanes(int stageCount, int laps)
+    {
+        int visits = Mathf.Max(1, stageCount * Mathf.Max(1, laps));
+        if (chartNotes.Count == 0 || stageCount <= 0)
+            return;
+
+        float segment = Mathf.Max(0.01f, LastNoteTime) / visits;
+        float lead = travelTime + 0.85f;
+        for (int i = 0; i < chartNotes.Count; i++)
+        {
+            float time = chartNotes[i].NoteData.time;
+            int visit = Mathf.Clamp(Mathf.FloorToInt(time / segment), 0, visits - 1);
+            if (time - visit * segment < lead && visit > 0)
+                visit--;
+
+            chartNotes[i].NoteData.lane = visit % stageCount;
         }
     }
 
@@ -219,8 +305,14 @@ public class ChartRuntimeManager : MonoBehaviour
         // 한 레인의 연속 노트까지 한 번에 소비하지 않도록 후보는 레인마다 하나로 제한합니다.
         if (remixMode)
         {
-            for (int lane = 0; lane < remixLanes.Count; lane++)
+            int lane = _activeLane >= 0 ? _activeLane : -1;
+            if (lane >= 0)
                 JudgeCandidate(FindBestCandidate(lane));
+            else
+            {
+                for (int remixLane = 0; remixLane < remixLanes.Count; remixLane++)
+                    JudgeCandidate(FindBestCandidate(remixLane));
+            }
             return;
         }
 
@@ -238,6 +330,20 @@ public class ChartRuntimeManager : MonoBehaviour
         }
 
         float error = Mathf.Abs(audioSource.time - candidate.NoteData.time);
+        // 함정은 타이밍이 맞아도 성공이 아닙니다. 판정창 안에서 누르면 무조건 실패입니다.
+        if (candidate.NoteData.kind == 1)
+        {
+            if (error > fairWindow)
+            {
+                Debug.Log(string.Format("[ChartRuntime] Input -> outside fair window ({0:F3}s)", error));
+                return;
+            }
+
+            ConsumeNote(candidate, JudgeResult.Miss);
+            Debug.Log(string.Format("[ChartRuntime] Trap hit ({0:F3}s)", error));
+            return;
+        }
+
         JudgeResult result = EvaluateJudge(error);
 
         if (result == JudgeResult.None || result == JudgeResult.Miss)
@@ -250,22 +356,99 @@ public class ChartRuntimeManager : MonoBehaviour
         Debug.Log(string.Format("[ChartRuntime] {0} ({1:F3}s)", result, error));
     }
 
-    private void SpawnPendingNotes()
+    public void SetSpawnHold(bool hold)
+    {
+        _spawnHold = hold;
+    }
+
+    public bool IsReadyToSwitch(float quietFor)
+    {
+        if (_spawnHold || audioSource == null)
+            return false;
+
+        if (HasActiveProjectiles())
+            return false;
+
+        return SecondsUntilNextSpawn() > quietFor;
+    }
+
+    private bool HasActiveProjectiles()
+    {
+        for (int i = 0; i < chartNotes.Count; i++)
+        {
+            RuntimeChartNote note = chartNotes[i];
+            if (!note.IsConsumed && note.IsSpawned && IsLaneOpen(note))
+                return true;
+        }
+
+        return false;
+    }
+
+    private float SecondsUntilNextSpawn()
     {
         float currentTime = audioSource.time;
-
-        while (nextSpawnIndex < chartNotes.Count)
+        float wait = float.PositiveInfinity;
+        for (int i = 0; i < chartNotes.Count; i++)
         {
-            RuntimeChartNote runtimeNote = chartNotes[nextSpawnIndex];
-            float spawnTime = runtimeNote.NoteData.time - travelTime;
+            RuntimeChartNote note = chartNotes[i];
+            if (note.IsConsumed || note.IsSpawned || !IsLaneOpen(note))
+                continue;
 
+            float until = note.NoteData.time - travelTime - currentTime;
+            if (until >= 0f && until < wait)
+                wait = until;
+        }
+
+        return wait;
+    }
+
+    public void SetActiveLane(int lane)
+    {
+        _activeLane = lane;
+        if (audioSource == null)
+            return;
+
+        float currentTime = audioSource.time;
+        for (int i = 0; i < chartNotes.Count; i++)
+        {
+            RuntimeChartNote note = chartNotes[i];
+            if (note.IsConsumed || note.NoteData.lane == lane)
+                continue;
+
+            if (note.IsSpawned || currentTime > note.NoteData.time + fairWindow)
+                ConsumeNote(note, JudgeResult.Ignored);
+        }
+    }
+
+    private bool IsLaneOpen(RuntimeChartNote note)
+    {
+        return _activeLane < 0 || note.NoteData.lane == _activeLane;
+    }
+
+    private void SpawnPendingNotes()
+    {
+        if (_spawnHold)
+            return;
+
+        float currentTime = audioSource.time;
+
+        for (int i = 0; i < chartNotes.Count; i++)
+        {
+            RuntimeChartNote runtimeNote = chartNotes[i];
+            if (runtimeNote.IsSpawned || runtimeNote.IsConsumed)
+                continue;
+
+            float spawnTime = runtimeNote.NoteData.time - travelTime;
             if (currentTime < spawnTime)
-            {
                 break;
-            }
+
+            if (!IsLaneOpen(runtimeNote))
+                continue;
+
+            if (_activeLane >= 0 && currentTime > spawnTime + 0.25f)
+                continue;
 
             SpawnRuntimeNote(runtimeNote);
-            nextSpawnIndex++;
         }
     }
 
@@ -279,9 +462,13 @@ public class ChartRuntimeManager : MonoBehaviour
         // 일반 모드는 기존 연결을 사용하고 리믹스는 채보 lane에 해당하는 경로를 선택합니다.
         RemixLane lane = remixMode ? remixLanes[runtimeNote.NoteData.lane] : null;
         Transform origin = lane != null ? lane.spawnPoint : spawnPoint;
+        Transform target = lane != null ? lane.hitBox : judgePoint;
+        if (origin == null || target == null)
+            return;
+
         runtimeNote.SpawnPoint = origin;
-        runtimeNote.JudgePoint = lane != null ? lane.hitBox : judgePoint;
-        GameObject prefab = lane != null && lane.notePrefab != null ? lane.notePrefab : notePrefab;
+        runtimeNote.JudgePoint = target;
+        GameObject prefab = PrefabFor(runtimeNote.NoteData.kind, lane);
 
         GameObject noteObject;
 
@@ -311,6 +498,10 @@ public class ChartRuntimeManager : MonoBehaviour
         }
 
         noteObject.name = string.Format("ChartNote_{0:F3}", runtimeNote.NoteData.time);
+        if (runtimeNote.NoteData.kind == 1 && trapNotePrefab == null)
+            Tint(noteObject, new Color(0.45f, 0.08f, 0.08f));
+        else if (runtimeNote.NoteData.kind == 2 && zigzagNotePrefab == null)
+            Tint(noteObject, new Color(1f, 0.82f, 0.15f));
 
         runtimeNote.GameObject = noteObject;
         runtimeNote.IsSpawned = true;
@@ -334,11 +525,52 @@ public class ChartRuntimeManager : MonoBehaviour
                 ? 1f
                 : Mathf.InverseLerp(spawnTime, runtimeNote.NoteData.time, currentTime);
 
-            runtimeNote.GameObject.transform.position = Vector3.Lerp(
-                runtimeNote.SpawnPoint.position,
-                runtimeNote.JudgePoint.position,
-                normalized
-            );
+            Vector3 from = runtimeNote.SpawnPoint.position;
+            Vector3 to = runtimeNote.JudgePoint.position;
+            Vector3 position = Vector3.Lerp(from, to, normalized);
+            if (runtimeNote.NoteData.kind == 2)
+                position += ZigzagOffset(from, to, normalized);
+
+            runtimeNote.GameObject.transform.position = position;
+        }
+    }
+
+    private Vector3 ZigzagOffset(Vector3 from, Vector3 to, float normalized)
+    {
+        Vector3 line = to - from;
+        if (line.sqrMagnitude < 0.0001f)
+            return Vector3.zero;
+
+        Vector3 side = Vector3.Cross(line.normalized, Vector3.up);
+        if (side.sqrMagnitude < 0.0001f)
+            side = Vector3.Cross(line.normalized, Vector3.right);
+
+        int turns = Mathf.Max(1, zigzagTurns);
+        float wave = Mathf.Sin(normalized * Mathf.PI * turns);
+        return side.normalized * (wave * line.magnitude * zigzagWidth);
+    }
+
+    private GameObject PrefabFor(int kind, RemixLane lane)
+    {
+        if (kind == 1 && trapNotePrefab != null)
+            return trapNotePrefab;
+        if (kind == 2 && zigzagNotePrefab != null)
+            return zigzagNotePrefab;
+        if (lane != null && lane.notePrefab != null)
+            return lane.notePrefab;
+        return notePrefab;
+    }
+
+    private static void Tint(GameObject noteObject, Color color)
+    {
+        var block = new MaterialPropertyBlock();
+        Renderer[] renderers = noteObject.GetComponentsInChildren<Renderer>();
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            renderers[i].GetPropertyBlock(block);
+            block.SetColor("_BaseColor", color);
+            block.SetColor("_Color", color);
+            renderers[i].SetPropertyBlock(block);
         }
     }
 
@@ -352,6 +584,12 @@ public class ChartRuntimeManager : MonoBehaviour
 
             if (runtimeNote.IsConsumed || currentTime <= runtimeNote.NoteData.time + fairWindow)
             {
+                continue;
+            }
+
+            if (!runtimeNote.IsSpawned || !IsLaneOpen(runtimeNote) || runtimeNote.NoteData.kind == 1 || _spawnHold)
+            {
+                ConsumeNote(runtimeNote, JudgeResult.Ignored);
                 continue;
             }
 
@@ -429,7 +667,7 @@ public class ChartRuntimeManager : MonoBehaviour
         // 위에서 이미 소비 처리했으므로 Fair 노트가 나중에 시간 초과로 다시 감점되지는 않습니다.
         if (result == JudgeResult.Fair || result == JudgeResult.Miss)
             NoteMiss?.Invoke();
-        else
+        else if (result != JudgeResult.Ignored)
             NoteHit?.Invoke();
 
         if (runtimeNote.GameObject != null)
@@ -544,7 +782,8 @@ public class ChartRuntimeManager : MonoBehaviour
         {
             if (!note.IsConsumed)
             {
-                ConsumeNote(note, JudgeResult.Miss);
+                bool missed = note.IsSpawned && note.NoteData.kind != 1;
+                ConsumeNote(note, missed ? JudgeResult.Miss : JudgeResult.Ignored);
             }
         }
 

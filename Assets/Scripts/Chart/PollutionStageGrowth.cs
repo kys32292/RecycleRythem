@@ -31,6 +31,23 @@ public class PollutionStageGrowth : MonoBehaviour
             pollution = FindFirstObjectByType<PollutionManager>();
     }
 
+    public void Use(PollutionManager manager)
+    {
+        if (pollution == manager)
+            return;
+
+        if (isActiveAndEnabled && pollution != null)
+            pollution.ValueChanged -= Apply;
+
+        pollution = manager;
+        if (!isActiveAndEnabled || pollution == null)
+            return;
+
+        pollution.ValueChanged += Apply;
+        _stage = -1;
+        Apply(pollution.CurrentValue);
+    }
+
     private void OnEnable()
     {
         if (pollution == null)

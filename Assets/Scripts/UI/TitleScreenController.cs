@@ -8,6 +8,7 @@ public class TitleScreenController : MonoBehaviour
 
     public void OnClickStart()
     {
+        FourCutIntro.ComingFromTitle = true;
         SceneManager.LoadScene(gameSceneName);
     }
 

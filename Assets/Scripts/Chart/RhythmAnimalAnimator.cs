@@ -63,6 +63,25 @@ public class RhythmAnimalAnimator : MonoBehaviour
         PlayIdle();
     }
 
+    public void Use(ChartRuntimeManager manager)
+    {
+        if (chart == manager)
+            return;
+
+        if (isActiveAndEnabled && chart != null)
+        {
+            chart.NoteHit -= PlayHit;
+            chart.NoteMiss -= PlayMiss;
+        }
+
+        chart = manager;
+        if (!isActiveAndEnabled || chart == null)
+            return;
+
+        chart.NoteHit += PlayHit;
+        chart.NoteMiss += PlayMiss;
+    }
+
     private void OnEnable()
     {
         if (chart == null)

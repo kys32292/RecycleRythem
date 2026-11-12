@@ -25,7 +25,7 @@ public class EarthDragRotate : MonoBehaviour
         Zoom(mouse);
 
         if (mouse.leftButton.wasPressedThisFrame)
-            _dragging = !IsPointerOverUi();
+            _dragging = !IsPointerOverUi() && !MoonProximityRotate.IsPointerNear(mouse);
 
         if (!mouse.leftButton.isPressed)
             _dragging = false;

@@ -8,8 +8,18 @@
             "lane": 0
         },
         {
+            "time": 7.5,
+            "lane": 0,
+            "kind": 1
+        },
+        {
             "time": 13.8,
             "lane": 0
+        },
+        {
+            "time": 19.0,
+            "lane": 0,
+            "kind": 2
         },
         {
             "time": 24.3,

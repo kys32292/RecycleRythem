@@ -127,6 +127,7 @@ public class SongEndResultTexts : MonoBehaviour
         if (black != null)
         {
             black.DOKill();
+            black.raycastTarget = false;
             Color color = black.color;
             color.a = 0f;
             black.color = color;

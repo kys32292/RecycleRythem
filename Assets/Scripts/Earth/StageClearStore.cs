@@ -1,19 +1,31 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Remembers which stage scenes were cleared so the earth map can show them later.
+/// Remembers cleared stages only for the current play.
+/// Starting the game again clears them.
 /// </summary>
 public static class StageClearStore
 {
     private const string Prefix = "stage-clear:";
+    private static readonly string[] SceneNames = { "Stage1", "Stage2", "Stage3", "Stage4", "Stage5" };
+    private static readonly HashSet<string> Cleared = new HashSet<string>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void ResetForNewSession()
+    {
+        Cleared.Clear();
+        for (int i = 0; i < SceneNames.Length; i++)
+            PlayerPrefs.DeleteKey(Prefix + SceneNames[i]);
+        PlayerPrefs.Save();
+    }
 
     public static void MarkCleared(string sceneName)
     {
         if (string.IsNullOrEmpty(sceneName))
             return;
 
-        PlayerPrefs.SetInt(Prefix + sceneName, 1);
-        PlayerPrefs.Save();
+        Cleared.Add(sceneName);
     }
 
     public static bool IsCleared(string sceneName)
@@ -21,6 +33,6 @@ public static class StageClearStore
         if (string.IsNullOrEmpty(sceneName))
             return false;
 
-        return PlayerPrefs.GetInt(Prefix + sceneName, 0) == 1;
+        return Cleared.Contains(sceneName);
     }
 }
