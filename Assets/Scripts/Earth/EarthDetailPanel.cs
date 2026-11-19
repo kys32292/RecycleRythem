@@ -66,6 +66,7 @@ public class EarthDetailPanel : MonoBehaviour, IPointerClickHandler
         if (!_visible || _hiding || string.IsNullOrEmpty(_sceneName))
             return;
 
+        GameFeedback.Current?.PlayClick();
         SceneManager.LoadScene(_sceneName);
     }
 
@@ -109,6 +110,7 @@ public class EarthDetailPanel : MonoBehaviour, IPointerClickHandler
         _enterFrom = enterFrom;
         _sceneName = sceneName;
         gameObject.SetActive(true);
+        GameFeedback.Current?.PlayImageArrival();
         _rect.anchoredPosition = Offset(enterFrom);
         _visible = true;
         _hiding = false;

@@ -1023,6 +1023,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1502463124}
     - target: {fileID: 2804081412436734351, guid: 67b413bc618a3c041a8a6c3c3593d5e5, type: 3}
+      propertyPath: noteImpact
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2804081412436734351, guid: 67b413bc618a3c041a8a6c3c3593d5e5, type: 3}
       propertyPath: notePrefab
       value: 
       objectReference: {fileID: 100000, guid: a119eb0fa059db34bbaef286c1af1696, type: 3}

@@ -31,6 +31,7 @@ public class ChartRuntimeManager : MonoBehaviour
         public GameObject notePrefab;
         public GameObject trapNotePrefab;
         public GameObject zigzagNotePrefab;
+        public NoteImpact noteImpact;
     }
 
     // 목록 인덱스가 JSON의 lane 번호입니다. 입력 키는 모든 경로가 공유합니다.
@@ -55,6 +56,7 @@ public class ChartRuntimeManager : MonoBehaviour
     [SerializeField] private bool playOnStart = true;
 
     [Header("Visuals")]
+    [SerializeField] private NoteImpact noteImpact;
     [FormerlySerializedAs("upperNotePrefab")]
     [SerializeField] private GameObject notePrefab;
     [Tooltip("비워 두면 일반 투사체를 어두운 빨간색으로 씁니다. 누르면 실패이고, 안 누르면 통과입니다.")]
@@ -191,7 +193,8 @@ public class ChartRuntimeManager : MonoBehaviour
                 hitBox = judges[i],
                 notePrefab = source != null ? source.NotePrefab : null,
                 trapNotePrefab = source != null ? source.TrapNotePrefab : null,
-                zigzagNotePrefab = source != null ? source.ZigzagNotePrefab : null
+                zigzagNotePrefab = source != null ? source.ZigzagNotePrefab : null,
+                noteImpact = source != null ? source.noteImpact : noteImpact
             });
         }
     }
@@ -494,6 +497,7 @@ public class ChartRuntimeManager : MonoBehaviour
 
         runtimeNote.SpawnPoint = origin;
         runtimeNote.JudgePoint = target;
+        runtimeNote.Impact = lane != null ? lane.noteImpact : noteImpact;
         GameObject prefab = PrefabFor(runtimeNote.NoteData.kind, lane);
 
         GameObject noteObject;
@@ -704,24 +708,25 @@ public class ChartRuntimeManager : MonoBehaviour
         // Fair도 실패로 처리합니다. 실패 이벤트를 공통으로 보내 오염도 -20과 실패 애니메이션을 적용합니다.
         // 위에서 이미 소비 처리했으므로 Fair 노트가 나중에 시간 초과로 다시 감점되지는 않습니다.
         if (result == JudgeResult.Fair || result == JudgeResult.Miss)
+        {
+            GameFeedback.Current?.PlayMiss();
             NoteMiss?.Invoke();
+        }
         else if (result != JudgeResult.Ignored)
+        {
+            GameFeedback.Current?.PlayHit(runtimeNote.Impact, runtimeNote.JudgePoint);
             NoteHit?.Invoke();
+        }
 
         if (runtimeNote.GameObject != null)
         {
             GameObject body = runtimeNote.GameObject;
             runtimeNote.GameObject = null;
-            if (ShouldDriveCar(runtimeNote))
+            if (runtimeNote.Impact == NoteImpact.Car)
                 StartCoroutine(DriveCarAway(body, runtimeNote, result));
             else
                 Destroy(body, cleanupDelayAfterJudge);
         }
-    }
-
-    private static bool ShouldDriveCar(RuntimeChartNote runtimeNote)
-    {
-        return runtimeNote.SpawnPoint != null && runtimeNote.SpawnPoint.gameObject.scene.name == "Stage1";
     }
 
     private IEnumerator DriveCarAway(GameObject body, RuntimeChartNote runtimeNote, JudgeResult result)
@@ -916,6 +921,7 @@ public class ChartRuntimeManager : MonoBehaviour
         // 생성 시 결정한 경로를 저장해 각 노트가 자신의 히트 박스로 이동합니다.
         public Transform SpawnPoint { get; set; }
         public Transform JudgePoint { get; set; }
+        public NoteImpact Impact { get; set; }
         public bool IsSpawned { get; set; }
         public bool IsConsumed { get; set; }
         public JudgeResult Result { get; set; }

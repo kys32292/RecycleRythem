@@ -21,6 +21,7 @@ public class ReturnToMainButton : MonoBehaviour
         if (string.IsNullOrEmpty(sceneName))
             return;
 
+        GameFeedback.Current?.PlayClick();
         SceneManager.LoadScene(sceneName);
     }
 }

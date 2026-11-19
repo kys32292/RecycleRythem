@@ -70,6 +70,7 @@ public class TitleIntroImage : MonoBehaviour
         sequence.SetLink(gameObject);
         if (delay > 0f)
             sequence.AppendInterval(delay);
+        sequence.AppendCallback(() => GameFeedback.Current?.PlayImageArrival());
         sequence.Append(transform.DOScale(peak, growDuration).SetEase(Ease.OutCubic));
         sequence.Append(transform.DOScale(settle, settleDuration).SetEase(Ease.OutQuad));
     }

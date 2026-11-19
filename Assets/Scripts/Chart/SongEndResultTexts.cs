@@ -86,7 +86,7 @@ public class SongEndResultTexts : MonoBehaviour
         for (int i = 0; i < lines.Length && i < waits.Length; i++)
         {
             yield return new WaitForSecondsRealtime(waits[i]);
-            Show(lines[i]);
+            Show(lines[i], success, i == 0);
             if (i == lastIndex)
                 ClearBlack();
         }
@@ -109,7 +109,7 @@ public class SongEndResultTexts : MonoBehaviour
         }
     }
 
-    private void Show(TMP_Text text)
+    private void Show(TMP_Text text, bool success, bool firstLine)
     {
         if (text == null)
             return;
@@ -120,6 +120,24 @@ public class SongEndResultTexts : MonoBehaviour
             .SetUpdate(true)
             .SetLink(text.gameObject)
             .SetTarget(text);
+
+        if (!firstLine)
+            return;
+
+        GameFeedback.Current?.PlayResult(success);
+        RectTransform rect = text.rectTransform;
+        float restY = rect.anchoredPosition.y;
+        rect.anchoredPosition += Vector2.up * (success ? -24f : 14f);
+        rect.DOAnchorPosY(restY, appearDuration)
+            .SetEase(success ? Ease.OutBack : Ease.OutSine)
+            .SetUpdate(true)
+            .SetLink(text.gameObject)
+            .SetTarget(text)
+            .OnKill(() =>
+            {
+                if (rect != null)
+                    rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, restY);
+            });
     }
 
     private void ClearBlack()

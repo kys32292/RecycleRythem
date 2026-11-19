@@ -104,6 +104,7 @@ public class SongEndFade : MonoBehaviour
     {
         if (gameObject.scene.name == "Stage5" && ClearedStage5())
         {
+            GameFeedback.Current?.PlayResult(true);
             SceneManager.LoadScene("end scen");
             return;
         }

@@ -20,6 +20,7 @@ public class EarthHotspot : MonoBehaviour, IPointerClickHandler
         if (panel == null)
             return;
 
+        GameFeedback.Current?.PlayClick();
         panel.Show(detailImage, enterFrom, sceneName);
     }
 }

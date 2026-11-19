@@ -96,6 +96,7 @@ public class FourCutIntro : MonoBehaviour
         Piece piece = _pieces[_next];
         piece.Active = true;
         piece.Rect.gameObject.SetActive(true);
+        GameFeedback.Current?.PlayImageArrival();
         _pieces[_next] = piece;
         _next++;
         _wait = gap;
@@ -307,6 +308,7 @@ public class FourCutIntro : MonoBehaviour
         image.color = new Color(1f, 1f, 1f, 0.92f);
         var button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;
+        button.onClick.AddListener(() => GameFeedback.Current?.PlayClick());
         button.onClick.AddListener(BeginFade);
 
         var labelObject = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));

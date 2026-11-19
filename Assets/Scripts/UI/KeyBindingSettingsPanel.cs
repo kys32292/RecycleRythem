@@ -59,6 +59,7 @@ public class KeyBindingSettingsPanel : MonoBehaviour
     public void BeginRebind()
     {
         if (prompt == null || waiting) return;
+        GameFeedback.Current?.PlayClick();
         waiting = true;
         startedFrame = Time.frameCount;
         previousInteractable = settingsGroup.interactable;

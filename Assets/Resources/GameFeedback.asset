@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 288d593aac154ac1abb9b0429f27f5fe, type: 3}
+  m_Name: GameFeedback
+  m_EditorClassIdentifier: 
+  click:
+    clip: {fileID: 8300000, guid: 6465d6a728974f1ba70b174be287a6f8, type: 3}
+    volume: 0.42
+  imageArrival:
+    clip: {fileID: 8300000, guid: 969a0577d8fc4235933ce77398f9a068, type: 3}
+    volume: 0.32
+  resultSuccess:
+    clip: {fileID: 8300000, guid: 0becff3e096e4e63a0850a390269d7e5, type: 3}
+    volume: 0.59
+  resultFailure:
+    clip: {fileID: 8300000, guid: 567ab253cd494fc0bd7c76591acae413, type: 3}
+    volume: 0.53
+  missedNote:
+    clip: {fileID: 8300000, guid: 73e534af713d4f679299b8284333f3f8, type: 3}
+    volume: 0.24
+  car:
+    clip: {fileID: 8300000, guid: bd29e2b22e0844ad8948a144cf855404, type: 3}
+    volume: 0.65
+    burst: {fileID: 7144756651780847949, guid: 04e8b0b6ae02ffb419cc12f41626e4e5, type: 3}
+    scale: 3.6
+    heightAboveHitBox: 1.35
+  plant:
+    clip: {fileID: 8300000, guid: 8d51fb860ab341e898417c1549741822, type: 3}
+    volume: 0.57
+    burst: {fileID: 8157350296306252638, guid: 826ae61451417b94897e4b852dec721d, type: 3}
+    scale: 0.85
+    heightAboveHitBox: 0.65
+  soilColor: {r: 0.72, g: 0.47, b: 0.25, a: 0.9}
+  deflect:
+    clip: {fileID: 8300000, guid: 2feaeb0f16994f429d286dd976387949, type: 3}
+    volume: 0.54
+    burst: {fileID: 5514457590661375421, guid: 6d9be190363175c47a89407642a9a0b9, type: 3}
+    scale: 3.2
+    heightAboveHitBox: 1.0

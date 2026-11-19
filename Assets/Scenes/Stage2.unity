@@ -15601,6 +15601,10 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 2804081412436734351, guid: 67b413bc618a3c041a8a6c3c3593d5e5, type: 3}
+      propertyPath: noteImpact
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 2804081412436734351, guid: 67b413bc618a3c041a8a6c3c3593d5e5, type: 3}
       propertyPath: judgePoint
       value: 
       objectReference: {fileID: 1596438119}
