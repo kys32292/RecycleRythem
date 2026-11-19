@@ -107,7 +107,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _AlphaClip: 0
-    - _AlphaClipThreshold: 0.554
+    - _AlphaClipThreshold: 0.591
     - _AlphaCutoff: 0.5
     - _Blend: 0
     - _BumpScale: 1
@@ -117,9 +117,9 @@ Material:
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
-    - _DistanceFadeEnd: 50
-    - _DistanceFadeOpacity: 0.8
-    - _DistanceFadeStart: 13.2
+    - _DistanceFadeEnd: 1
+    - _DistanceFadeOpacity: 0.059
+    - _DistanceFadeStart: 1
     - _DstBlend: 0
     - _EnvironmentReflections: 1
     - _GlossMapScale: 0
@@ -133,7 +133,7 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _Roughness: 1
+    - _Roughness: 0.714
     - _ShadowRecievedStrength: 1
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
@@ -142,8 +142,8 @@ Material:
     - _Surface: 0
     - _UseEmissionTexture: 0
     - _Usevertexcolorforwind: 0
-    - _WindScale: 0.264
-    - _WindStrength: 0.196
+    - _WindScale: 0
+    - _WindStrength: 0
     - _WindTintContrast: 1
     - _WindTintOpacity: 0
     - _WindTintScale: 0

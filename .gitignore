@@ -74,3 +74,6 @@ crashlytics-build.properties
 *.bak
 *.swp
 *~
+
+# Installer archives. The imported assets stay in the project.
+*.unitypackage

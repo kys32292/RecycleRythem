@@ -1,5 +1,6 @@
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
@@ -101,8 +102,28 @@ public class SongEndFade : MonoBehaviour
 
     private void ShowResult()
     {
+        if (gameObject.scene.name == "Stage5")
+        {
+            SceneManager.LoadScene(ClearedStage5() ? "end scen" : "Main테스트");
+            return;
+        }
+
         if (resultTexts != null)
             resultTexts.Play();
+    }
+
+    private bool ClearedStage5()
+    {
+        PollutionManager[] managers = FindObjectsByType<PollutionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < managers.Length; i++)
+        {
+            if (managers[i].gameObject.scene != gameObject.scene)
+                continue;
+
+            return managers[i].CurrentValue > 50;
+        }
+
+        return false;
     }
 
     private void SetAlpha(float alpha)

@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 노트 판정과 오염도 수치를 분리합니다. ChartRuntimeManager는 타이밍을,
@@ -22,8 +21,8 @@ public class PollutionManager : MonoBehaviour
     // 중간에 0이 되어도 종료하지 않습니다. 최종 판정 시점은 음악이 끝났을 때입니다.
     public const int MaxValue = 100;
     public const int StartingValue = 50;
-    public const int HitGain = 5;
-    public const int MissLoss = 20;
+    public const int HitGain = 10;
+    public const int MissLoss = 10;
 
     [SerializeField, Range(0, MaxValue)] private int currentValue = StartingValue;
     public int CurrentValue => currentValue;
@@ -105,7 +104,7 @@ public class PollutionManager : MonoBehaviour
             : currentValue > 50 ? RoundResult.Clear : RoundResult.Failed;
 
         if (Result == RoundResult.Clear || Result == RoundResult.GreatSuccess)
-            StageClearStore.MarkCleared(SceneManager.GetActiveScene().name);
+            StageClearStore.MarkCleared(gameObject.scene.name);
 
         RoundFinished?.Invoke(Result);
         Debug.Log($"[Pollution] Song ended: {currentValue}/{MaxValue} -> {Result}");

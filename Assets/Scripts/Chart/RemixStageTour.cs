@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -26,7 +27,7 @@ public class RemixStageTour : MonoBehaviour
     [SerializeField] private string[] stageScenes = { "Stage1", "Stage2", "Stage3", "Stage4" };
     [SerializeField] private int laps = 2;
     [SerializeField] private float fadeDuration = 0.08f;
-    [SerializeField] private Vector3 stageSeparation = new Vector3(700f, 0f, 0f);
+    [SerializeField] private Vector3 stageSeparation = Vector3.zero;
 
     private readonly List<LoadedStage> _stages = new List<LoadedStage>();
     private Image _fade;
@@ -199,16 +200,13 @@ public class RemixStageTour : MonoBehaviour
         BindStage(_stages[stage].Scene, chart, _pollution);
 
         LoadedStage visit = _stages[stage];
+        if (visit.Scene.IsValid() && visit.Scene.isLoaded)
+            SceneManager.SetActiveScene(visit.Scene);
+
         if (tourCamera == null || visit.Viewpoint == null)
             return;
 
-        if (visit.SourceCamera != null)
-        {
-            tourCamera.fieldOfView = visit.SourceCamera.fieldOfView;
-            tourCamera.nearClipPlane = visit.SourceCamera.nearClipPlane;
-            tourCamera.farClipPlane = visit.SourceCamera.farClipPlane;
-        }
-
+        MatchCamera(tourCamera, visit.SourceCamera);
         tourCamera.transform.SetPositionAndRotation(visit.Viewpoint.position, visit.Viewpoint.rotation);
         if (immediate)
             SetFade(0f);
@@ -373,7 +371,39 @@ public class RemixStageTour : MonoBehaviour
             PollutionStageGrowth[] growths = roots[i].GetComponentsInChildren<PollutionStageGrowth>(true);
             for (int a = 0; a < growths.Length; a++)
                 growths[a].Use(pollution);
+
+            PollutionFactoryVisibility[] factories = roots[i].GetComponentsInChildren<PollutionFactoryVisibility>(true);
+            for (int a = 0; a < factories.Length; a++)
+                factories[a].Use(pollution);
         }
+    }
+
+    private static void MatchCamera(Camera tourCamera, Camera source)
+    {
+        if (source == null)
+            return;
+
+        tourCamera.clearFlags = source.clearFlags;
+        tourCamera.backgroundColor = source.backgroundColor;
+        tourCamera.cullingMask = source.cullingMask;
+        tourCamera.orthographic = source.orthographic;
+        tourCamera.orthographicSize = source.orthographicSize;
+        tourCamera.fieldOfView = source.fieldOfView;
+        tourCamera.nearClipPlane = source.nearClipPlane;
+        tourCamera.farClipPlane = source.farClipPlane;
+        tourCamera.allowHDR = source.allowHDR;
+
+        UniversalAdditionalCameraData sourceData = source.GetComponent<UniversalAdditionalCameraData>();
+        UniversalAdditionalCameraData tourData = tourCamera.GetComponent<UniversalAdditionalCameraData>();
+        if (sourceData == null || tourData == null)
+            return;
+
+        tourData.renderShadows = sourceData.renderShadows;
+        tourData.renderPostProcessing = sourceData.renderPostProcessing;
+        tourData.antialiasing = sourceData.antialiasing;
+        tourData.antialiasingQuality = sourceData.antialiasingQuality;
+        tourData.dithering = sourceData.dithering;
+        tourData.renderType = sourceData.renderType;
     }
 
     private static void SetPresentation(Scene scene, bool active)
