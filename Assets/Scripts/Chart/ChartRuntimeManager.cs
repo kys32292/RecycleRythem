@@ -29,6 +29,8 @@ public class ChartRuntimeManager : MonoBehaviour
         public Transform hitBox;
         [Tooltip("비워 두면 공통 Note Prefab을 사용합니다.")]
         public GameObject notePrefab;
+        public GameObject trapNotePrefab;
+        public GameObject zigzagNotePrefab;
     }
 
     // 목록 인덱스가 JSON의 lane 번호입니다. 입력 키는 모든 경로가 공유합니다.
@@ -78,6 +80,14 @@ public class ChartRuntimeManager : MonoBehaviour
     public event Action PlaybackCompleted;
 
     public float LastNoteTime { get; private set; }
+    public Transform SpawnPoint => spawnPoint;
+    public Transform JudgePoint => judgePoint;
+    public GameObject NotePrefab => notePrefab;
+    public GameObject TrapNotePrefab => trapNotePrefab;
+    public GameObject ZigzagNotePrefab => zigzagNotePrefab;
+
+    private int _remixStageCount;
+    private int _remixLaps = 1;
     public float PlaybackTime => audioSource != null ? audioSource.time : 0f;
     public bool IsPlaybackActive => isPlaybackActive;
 
@@ -167,23 +177,36 @@ public class ChartRuntimeManager : MonoBehaviour
         return Mathf.Max(0.01f, LastNoteTime) / visits;
     }
 
-    public void ConfigureRemixLanes(System.Collections.Generic.IReadOnlyList<Transform> spawns, System.Collections.Generic.IReadOnlyList<Transform> judges)
+    public void ConfigureRemixLanes(System.Collections.Generic.IReadOnlyList<Transform> spawns, System.Collections.Generic.IReadOnlyList<Transform> judges, System.Collections.Generic.IReadOnlyList<ChartRuntimeManager> sources)
     {
         remixMode = true;
         remixLanes.Clear();
         int count = Mathf.Min(spawns.Count, judges.Count);
         for (int i = 0; i < count; i++)
         {
+            ChartRuntimeManager source = sources != null && i < sources.Count ? sources[i] : null;
             remixLanes.Add(new RemixLane
             {
                 spawnPoint = spawns[i],
-                hitBox = judges[i]
+                hitBox = judges[i],
+                notePrefab = source != null ? source.NotePrefab : null,
+                trapNotePrefab = source != null ? source.TrapNotePrefab : null,
+                zigzagNotePrefab = source != null ? source.ZigzagNotePrefab : null
             });
         }
     }
 
     public void AssignRoundRobinLanes(int stageCount, int laps)
     {
+        _remixStageCount = stageCount;
+        _remixLaps = laps;
+        ApplyRoundRobinLanes();
+    }
+
+    private void ApplyRoundRobinLanes()
+    {
+        int stageCount = _remixStageCount;
+        int laps = _remixLaps;
         int visits = Mathf.Max(1, stageCount * Mathf.Max(1, laps));
         if (chartNotes.Count == 0 || stageCount <= 0)
             return;
@@ -262,6 +285,9 @@ public class ChartRuntimeManager : MonoBehaviour
         {
             LoadChart();
         }
+
+        if (remixMode)
+            ApplyRoundRobinLanes();
 
         if (!isLoaded || !ValidateRuntimeSetup())
         {
@@ -552,10 +578,22 @@ public class ChartRuntimeManager : MonoBehaviour
 
     private GameObject PrefabFor(int kind, RemixLane lane)
     {
-        if (kind == 1 && trapNotePrefab != null)
-            return trapNotePrefab;
-        if (kind == 2 && zigzagNotePrefab != null)
-            return zigzagNotePrefab;
+        if (kind == 1)
+        {
+            if (lane != null && lane.trapNotePrefab != null)
+                return lane.trapNotePrefab;
+            if (trapNotePrefab != null)
+                return trapNotePrefab;
+        }
+
+        if (kind == 2)
+        {
+            if (lane != null && lane.zigzagNotePrefab != null)
+                return lane.zigzagNotePrefab;
+            if (zigzagNotePrefab != null)
+                return zigzagNotePrefab;
+        }
+
         if (lane != null && lane.notePrefab != null)
             return lane.notePrefab;
         return notePrefab;
@@ -672,9 +710,47 @@ public class ChartRuntimeManager : MonoBehaviour
 
         if (runtimeNote.GameObject != null)
         {
-            Destroy(runtimeNote.GameObject, cleanupDelayAfterJudge);
+            GameObject body = runtimeNote.GameObject;
             runtimeNote.GameObject = null;
+            if (ShouldDriveCar(runtimeNote))
+                StartCoroutine(DriveCarAway(body, runtimeNote, result));
+            else
+                Destroy(body, cleanupDelayAfterJudge);
         }
+    }
+
+    private static bool ShouldDriveCar(RuntimeChartNote runtimeNote)
+    {
+        return runtimeNote.SpawnPoint != null && runtimeNote.SpawnPoint.gameObject.scene.name == "Stage1";
+    }
+
+    private IEnumerator DriveCarAway(GameObject body, RuntimeChartNote runtimeNote, JudgeResult result)
+    {
+        Vector3 forward = Vector3.forward;
+        if (runtimeNote.SpawnPoint != null && runtimeNote.JudgePoint != null)
+            forward = runtimeNote.JudgePoint.position - runtimeNote.SpawnPoint.position;
+        if (forward.sqrMagnitude < 0.01f)
+            forward = body.transform.forward;
+        forward.Normalize();
+
+        bool launched = result == JudgeResult.Great || result == JudgeResult.Good;
+        Vector3 velocity = launched ? forward * 9f + Vector3.up * 16f : forward * 14f;
+        float duration = launched ? 1.2f : 1.6f;
+        float elapsed = 0f;
+        while (elapsed < duration && body != null)
+        {
+            float step = Time.deltaTime;
+            elapsed += step;
+            if (launched)
+                velocity += Vector3.down * 22f * step;
+            body.transform.position += velocity * step;
+            if (launched)
+                body.transform.Rotate(480f * step, 220f * step, 0f, Space.World);
+            yield return null;
+        }
+
+        if (body != null)
+            Destroy(body);
     }
 
     private ChartFileData TryLoadChart()

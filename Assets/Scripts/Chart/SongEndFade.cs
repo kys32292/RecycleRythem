@@ -102,9 +102,9 @@ public class SongEndFade : MonoBehaviour
 
     private void ShowResult()
     {
-        if (gameObject.scene.name == "Stage5")
+        if (gameObject.scene.name == "Stage5" && ClearedStage5())
         {
-            SceneManager.LoadScene(ClearedStage5() ? "end scen" : "Main테스트");
+            SceneManager.LoadScene("end scen");
             return;
         }
 

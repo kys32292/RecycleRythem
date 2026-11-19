@@ -47,6 +47,7 @@ public class RemixStageTour : MonoBehaviour
         public Camera SourceCamera;
         public Transform Spawn;
         public Transform Judge;
+        public ChartRuntimeManager Chart;
     }
 
     private void Awake()
@@ -64,6 +65,18 @@ public class RemixStageTour : MonoBehaviour
     private void Start()
     {
         StartCoroutine(LoadAndPlay());
+    }
+
+    private void LateUpdate()
+    {
+        if (!_ready || tourCamera == null || _shown < 0 || _shown >= _stages.Count)
+            return;
+
+        Camera source = _stages[_shown].SourceCamera;
+        if (source == null)
+            return;
+
+        tourCamera.transform.SetPositionAndRotation(source.transform.position, source.transform.rotation);
     }
 
     private void Update()
@@ -114,17 +127,20 @@ public class RemixStageTour : MonoBehaviour
             yield break;
         }
 
+        chart.LoadChart();
         var spawns = new List<Transform>(_stages.Count);
         var judges = new List<Transform>(_stages.Count);
+        var sources = new List<ChartRuntimeManager>(_stages.Count);
         for (int i = 0; i < _stages.Count; i++)
         {
             spawns.Add(_stages[i].Spawn);
             judges.Add(_stages[i].Judge);
+            sources.Add(_stages[i].Chart);
         }
 
         PollutionManager pollution = chart.GetComponent<PollutionManager>();
         _pollution = pollution;
-        chart.ConfigureRemixLanes(spawns, judges);
+        chart.ConfigureRemixLanes(spawns, judges, sources);
         chart.AssignRoundRobinLanes(_stages.Count, laps);
         _visits = Mathf.Max(1, _stages.Count * Mathf.Max(1, laps));
         _segment = chart.SegmentLength(_stages.Count, laps);
@@ -314,18 +330,24 @@ public class RemixStageTour : MonoBehaviour
     {
         Camera source = FindStageCamera(scene);
         Transform viewpoint = source != null ? source.transform : null;
-        Transform spawner = FindNamed(scene, "ChartSpawner");
-        Transform spawn = spawner;
-        Transform judge = null;
-        if (spawner != null)
+        ChartRuntimeManager stageChart = FindStageChart(scene);
+        Transform spawn = stageChart != null ? stageChart.SpawnPoint : null;
+        Transform judge = stageChart != null ? stageChart.JudgePoint : null;
+
+        if (spawn == null || judge == null)
         {
-            for (int i = 0; i < spawner.childCount; i++)
+            Transform spawner = FindNamed(scene, "ChartSpawner");
+            spawn = spawner;
+            if (spawner != null)
             {
-                Transform child = spawner.GetChild(i);
-                if (child.name == "HitChek")
-                    judge = child;
-                else if (child.name == "Cube")
-                    spawn = child;
+                for (int i = 0; i < spawner.childCount; i++)
+                {
+                    Transform child = spawner.GetChild(i);
+                    if (child.name == "HitChek")
+                        judge = child;
+                    else if (child.name == "Cube" && spawn == spawner)
+                        spawn = child;
+                }
             }
         }
 
@@ -344,8 +366,21 @@ public class RemixStageTour : MonoBehaviour
             Viewpoint = viewpoint,
             SourceCamera = source,
             Spawn = spawn,
-            Judge = judge
+            Judge = judge,
+            Chart = stageChart
         };
+    }
+
+    private static ChartRuntimeManager FindStageChart(Scene scene)
+    {
+        ChartRuntimeManager[] charts = Object.FindObjectsByType<ChartRuntimeManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < charts.Length; i++)
+        {
+            if (charts[i].gameObject.scene == scene)
+                return charts[i];
+        }
+
+        return null;
     }
 
     private static void BindStage(Scene scene, ChartRuntimeManager chart, PollutionManager pollution)
