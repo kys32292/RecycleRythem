@@ -1287,6 +1287,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1612926833}
     - target: {fileID: 2804081412436734351, guid: 67b413bc618a3c041a8a6c3c3593d5e5, type: 3}
+      propertyPath: notePrefab
+      value: 
+      objectReference: {fileID: 4474382198320302150, guid: 9cd1746789b311d4c9e0add4969236f1, type: 3}
+    - target: {fileID: 2804081412436734351, guid: 67b413bc618a3c041a8a6c3c3593d5e5, type: 3}
       propertyPath: spawnPoint
       value: 
       objectReference: {fileID: 1612926832}
